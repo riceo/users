@@ -1,4 +1,4 @@
-#
+  #
 # Cookbook Name:: users
 # Provider:: manage
 #
@@ -34,6 +34,10 @@ rescue NameError
   return false
 end
 
+class Chef::Provider
+  include Users::Groups
+end
+
 action :remove do
   if Chef::Config[:solo] and not chef_solo_search_installed?
     Chef::Log.warn("This recipe uses search. Chef Solo does not support search unless you install the chef-solo-search cookbook.")
@@ -48,14 +52,21 @@ action :remove do
 end
 
 action :create do
+
+  if new_resource.group_id then
+    group new_resource.group_name do
+      gid new_resource.group_id
+    end
+  end
+
   security_group = Array.new
+  groups = {}
 
   if Chef::Config[:solo] and not chef_solo_search_installed?
     Chef::Log.warn("This recipe uses search. Chef Solo does not support search unless you install the chef-solo-search cookbook.")
   else
     search(new_resource.data_bag, "groups:#{new_resource.search_group} AND NOT action:remove") do |u|
       u['username'] ||= u['id']
-      security_group << u['username']
 
       if node['apache'] and node['apache']['allowed_openids']
         Array(u['openid']).compact.each do |oid|
@@ -140,12 +151,58 @@ action :create do
           end
         end
       end
+
+      if u['groups']
+
+        chef_gem "etc" do
+          action :install
+        end
+
+        next_gid = get_gids().last + 1
+
+        u['groups'].each do |group_name|
+
+          if not groups[group_name].kind_of?(Hash) then
+            groups[group_name] = {}
+          end
+
+          if not groups[group_name]["gid"] then
+
+            if group_name == new_resource.group_name and new_resource.group_id
+              gid = new_resource.group_id
+            else
+              gid = next_gid
+            end
+
+            groups[group_name]["gid"] = gid
+          end
+
+          if not groups[group_name]["members"].kind_of?(Array) then
+            groups[group_name]["members"] = Array.new
+          end
+
+          groups[group_name]["members"].push(u['username'])
+          next_gid += 1
+        end
+      end
+
     end
   end
 
-  group new_resource.group_name do
-    gid new_resource.group_id
-    members security_group
+  groups.each_pair do |group_name, group_detail|
+    begin
+      group group_name do
+        members group_detail["members"]
+        action :manage
+        append true
+      end
+    rescue
+      group group_name do
+        gid group_detail["gid"]
+        members group_detail["members"]
+      end
+    end
   end
+
   new_resource.updated_by_last_action(true)
 end
