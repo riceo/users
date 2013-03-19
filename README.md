@@ -1,7 +1,9 @@
 Description
 ===========
 
-Creates users from a databag search.
+Creates users and groups from a databag search.
+
+My fork implements the ability to automatically assign a group ID to new groups, and creates any groups that users should be members of if they don't already exist.
 
 Requirements
 ============
