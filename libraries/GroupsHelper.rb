@@ -13,5 +13,18 @@ module Users
 
 			return gids.sort
 		end
+
+		def group_exists(group_name)
+
+			require 'etc'
+
+			begin
+				Etc.getgrnam(group_name)
+				return true
+			rescue
+				return false
+			end
+		end
+
 	end
 end

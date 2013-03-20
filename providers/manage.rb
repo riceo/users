@@ -190,18 +190,20 @@ action :create do
   end
 
   groups.each_pair do |group_name, group_detail|
-    begin
+
+    if group_exists(group_name) then
       group group_name do
         members group_detail["members"]
-        action :manage
+        action :modify
         append true
       end
-    rescue
+    else
       group group_name do
         gid group_detail["gid"]
         members group_detail["members"]
       end
     end
+
   end
 
   new_resource.updated_by_last_action(true)
